@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ethers } from "ethers";
+import { ARC_CHAIN_ID, ARCSCAN, switchToArc } from "@/lib/arcNetwork";
 
 // Solidity source for verification
 const CONTRACT_SOURCE = `// SPDX-License-Identifier: MIT
@@ -98,10 +99,6 @@ const CONTRACT_ABI = [
   "event OrderUpdated(uint256 indexed orderId, string status)",
 ];
 
-const ARC_CHAIN_ID = 5042002;
-const ARC_RPC = "https://rpc.testnet.arc.network";
-const ARCSCAN = "https://testnet.arcscan.app";
-
 export default function DeployPage() {
   const [account, setAccount] = useState<string>("");
   const [balance, setBalance] = useState<string>("");
@@ -121,27 +118,8 @@ export default function DeployPage() {
       const accounts = await provider.send("eth_requestAccounts", []) as string[];
       setAccount(accounts[0]);
 
-      // Switch to ARC testnet
-      try {
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x" + ARC_CHAIN_ID.toString(16) }],
-        });
-      } catch (switchError: unknown) {
-        const err = switchError as { code?: number };
-        if (err.code === 4902) {
-          await window.ethereum.request({
-            method: "wallet_addEthereumChain",
-            params: [{
-              chainId: "0x" + ARC_CHAIN_ID.toString(16),
-              chainName: "ARC Testnet",
-              nativeCurrency: { name: "ARC", symbol: "ARC", decimals: 18 },
-              rpcUrls: [ARC_RPC],
-              blockExplorerUrls: [ARCSCAN],
-            }],
-          });
-        }
-      }
+      // Always add ARC network and switch to it
+      await switchToArc();
 
       // Fetch balance
       const bal = await provider.getBalance(accounts[0]);
@@ -159,6 +137,10 @@ export default function DeployPage() {
       setDeploying(true);
       setStatus("Preparing deployment...");
       if (!window.ethereum) throw new Error("No wallet");
+
+      // Ensure on ARC before deploying
+      await switchToArc();
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       setStatus("Sending transaction...");
@@ -208,7 +190,7 @@ export default function DeployPage() {
         {/* STEP 1 — Wallet */}
         <div style={{ ...panelStyle, borderLeft: "3px solid var(--accent)" }}>
           <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "16px" }}>
-            STEP 1 / CONNECT WALLET
+            STEP 1 / CONNECT WALLET (auto-switches to ARC Testnet)
           </div>
           {account ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -229,7 +211,7 @@ export default function DeployPage() {
         {/* STEP 2 — Source */}
         <div style={panelStyle}>
           <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "16px" }}>
-            STEP 2 / CONTRACT SOURCE (read-only)
+            STEP 2 / CONTRACT SOURCE (read-only — use for verification)
           </div>
           <textarea readOnly value={CONTRACT_SOURCE} style={{ width: "100%", height: "320px", background: "#080808", border: "1px solid var(--border)", color: "#a0d8af", fontSize: "0.68rem", fontFamily: "inherit", padding: "12px", resize: "vertical", outline: "none" }} />
         </div>
@@ -261,7 +243,8 @@ export default function DeployPage() {
             <div style={{ marginTop: "20px", padding: "16px", border: "1px solid var(--green)", background: "rgba(0,184,148,0.06)" }}>
               <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "8px" }}>CONTRACT DEPLOYED</div>
               <div style={{ fontSize: "0.82rem", color: "var(--green)", fontWeight: 700, marginBottom: "12px", wordBreak: "break-all" }}>{contractAddress}</div>
-              <a href={`${ARCSCAN}/address/${contractAddress}`} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", padding: "8px 20px", border: "1px solid var(--green)", color: "var(--green)", textDecoration: "none", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em" }}>
+              <a href={`${ARCSCAN}/address/${contractAddress}`} target="_blank" rel="noopener noreferrer"
+                style={{ display: "inline-block", padding: "8px 20px", border: "1px solid var(--green)", color: "var(--green)", textDecoration: "none", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em" }}>
                 [ VIEW ON ARCSCAN ↗ ]
               </a>
             </div>
