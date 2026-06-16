@@ -4,202 +4,200 @@ import { useState } from "react";
 import { ethers } from "ethers";
 import { ARC_CHAIN_ID, ARCSCAN, switchToArc } from "@/lib/arcNetwork";
 
-// Solidity source for verification
 const CONTRACT_SOURCE = `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract PixelTipRegistry {
+contract PixelTip {
     address public owner;
-    uint256 public totalOrders;
+    uint256 public totalTips;
+    uint256 public totalVolume;
+    uint256 public platformFee; // basis points (100 = 1%)
 
-    struct Service {
-        string title;
-        uint256 priceUSDC;
+    struct Creator {
+        string name;
+        string category;
         bool active;
+        uint256 tipsReceived;
+        uint256 volumeReceived;
     }
 
-    struct Order {
-        address client;
-        uint8 serviceId;
+    struct Tip {
+        address sender;
+        address creator;
         uint256 amount;
         uint256 timestamp;
-        string status;
+        string message;
     }
 
-    Service[] public services;
-    Order[] public orders;
+    mapping(address => Creator) public creators;
+    mapping(address => uint256) public pendingWithdrawals;
+    address[] public creatorList;
+    Tip[] public tips;
 
-    event ServiceAdded(uint8 indexed id, string title, uint256 price);
-    event OrderPlaced(uint256 indexed orderId, address indexed client, uint8 serviceId);
-    event OrderUpdated(uint256 indexed orderId, string status);
+    event CreatorRegistered(address indexed creator, string name, string category);
+    event TipSent(address indexed sender, address indexed creator, uint256 amount, string message);
+    event Withdrawn(address indexed creator, uint256 amount);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
         _;
     }
 
-    constructor() {
+    constructor(uint256 _platformFee) {
         owner = msg.sender;
-        services.push(Service("Graphic Design", 40000000, true));
-        services.push(Service("Video Production", 55000000, true));
-        services.push(Service("3D Design & VFX", 70000000, true));
-        services.push(Service("English Tutoring", 25000000, true));
+        platformFee = _platformFee;
     }
 
-    function addService(string calldata title, uint256 priceUSDC) external onlyOwner {
-        uint8 id = uint8(services.length);
-        services.push(Service(title, priceUSDC, true));
-        emit ServiceAdded(id, title, priceUSDC);
+    function registerCreator(string calldata name, string calldata category) external {
+        require(!creators[msg.sender].active, "Already registered");
+        creators[msg.sender] = Creator(name, category, true, 0, 0);
+        creatorList.push(msg.sender);
+        emit CreatorRegistered(msg.sender, name, category);
     }
 
-    function toggleService(uint8 id, bool active) external onlyOwner {
-        services[id].active = active;
+    function tip(address creator, string calldata message) external payable {
+        require(msg.value > 0, "Send some ARC");
+        require(creators[creator].active, "Creator not found");
+        uint256 fee = (msg.value * platformFee) / 10000;
+        uint256 net = msg.value - fee;
+        creators[creator].tipsReceived++;
+        creators[creator].volumeReceived += net;
+        pendingWithdrawals[creator] += net;
+        pendingWithdrawals[owner] += fee;
+        totalTips++;
+        totalVolume += msg.value;
+        tips.push(Tip(msg.sender, creator, msg.value, block.timestamp, message));
+        emit TipSent(msg.sender, creator, msg.value, message);
     }
 
-    function placeOrder(uint8 serviceId) external {
-        require(serviceId < services.length, "Invalid service");
-        require(services[serviceId].active, "Service inactive");
-        uint256 orderId = orders.length;
-        orders.push(Order(msg.sender, serviceId, services[serviceId].priceUSDC, block.timestamp, "pending"));
-        totalOrders++;
-        emit OrderPlaced(orderId, msg.sender, serviceId);
+    function withdraw() external {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        require(amount > 0, "Nothing to withdraw");
+        pendingWithdrawals[msg.sender] = 0;
+        payable(msg.sender).transfer(amount);
+        emit Withdrawn(msg.sender, amount);
     }
 
-    function updateOrderStatus(uint256 orderId, string calldata status) external onlyOwner {
-        orders[orderId].status = status;
-        emit OrderUpdated(orderId, status);
-    }
-
-    function getServicesCount() external view returns (uint256) {
-        return services.length;
-    }
-
-    function getOrdersCount() external view returns (uint256) {
-        return orders.length;
+    function getCreatorsCount() external view returns (uint256) { return creatorList.length; }
+    function getTipsCount() external view returns (uint256) { return tips.length; }
+    function setPlatformFee(uint256 _fee) external onlyOwner {
+        require(_fee <= 1000, "Max 10%");
+        platformFee = _fee;
     }
 }`;
 
-// Real compiled bytecode (solc 0.8.35, optimizer 200 runs)
-const CONTRACT_BYTECODE = "0x608060405234801561000f575f5ffd5b505f80546001600160a01b031916331781556040805160a081018252600e606082019081526d23b930b83434b1902232b9b4b3b760911b608083015281526302625a0060208201526001918101829052600280549283018155909252815160039091025f51602061101a5f395f51905f520190819061008e9082610325565b506020828101516001808401919091556040938401516002938401805491151560ff19909216919091179055835160a0810185526010606082019081526f2b34b232b790283937b23ab1ba34b7b760811b608083015281526303473bc092810192909252928101839052815492830182555f91909152805190916003025f51602061101a5f395f51905f52019081906101279082610325565b506020828101516001808401919091556040938401516002938401805491151560ff19909216919091179055835160a081018552600f606082019081526e066884088cae6d2cedc404c40ac8cb608b1b6080830152815263042c1d8092810192909252928101839052815492830182555f91909152805190916003025f51602061101a5f395f51905f52019081906101bf9082610325565b506020828101516001808401919091556040938401516002938401805491151560ff19909216919091179055835160a0810185526010606082019081526f456e676c697368205475746f72696e6760801b6080830152815263017d784092810192909252928101839052815492830182555f91909152805190916003025f51602061101a5f395f51905f52019081906102589082610325565b50602082015160018201556040909101516002909101805460ff19169115159190911790556103e3565b634e487b7160e01b5f52604160045260245ffd5b600181811c908216806102aa57607f821691505b6020821081036102c857634e487b7160e01b5f52602260045260245ffd5b50919050565b601f821115610320578282111561032057805f5260205f20601f840160051c60208510156102f957505f5b90810190601f840160051c035f5b8181101561031c575f83820155600101610307565b5050505b505050565b81516001600160401b0381111561033e5761033e610282565b6103528161034c8454610296565b846102ce565b6020601f821160018114610384575f831561036d5750848201515b5f19600385901b1c1916600184901b1784556103dc565b5f84815260208120601f198516915b828110156103b35787850151825560209485019460019092019101610393565b50848210156103d057868401515f19600387901b60f8161c191681555b505060018360011b0184555b5050505050565b610c2a806103f05f395ff3fe608060405234801561000f575f5ffd5b506004361061009b575f3560e01c8063b039c39e11610063578063b039c39e14610126578063b5b3b05114610139578063c22c4f4314610141578063cc1a40b714610163578063ee64beed14610176575f5ffd5b80631d8344091461009f578063205fdde6146100bb5780636468ce28146100d05780638da5cb5b146100d8578063a85c38ef14610102575b5f5ffd5b6100a860015481565b6040519081526020015b60405180910390f35b6100ce6100c936600461076e565b610189565b005b6002546100a8565b5f546100ea906001600160a01b031681565b6040516001600160a01b0390911681526020016100b2565b6101156101103660046107b6565b61022c565b6040516100b29594939291906107fb565b6100ce610134366004610850565b610303565b6003546100a8565b61015461014f3660046107b6565b610368565b6040516100b293929190610889565b6100ce6101713660046108b2565b610427565b6100ce6101843660046108fa565b610534565b5f546001600160a01b031633146101bb5760405162461bcd60e51b81526004016101b29061091a565b60405180910390fd5b8181600385815481106101d0576101d061093d565b905f5260205f20906004020160030191826101ec9291906109f4565b50827f96fa16897ea031fbe303a21443875b84c1d41f189bd5936a19d9b6dd7c813edf838360405161021f929190610ad7565b60405180910390a2505050565b6003818154811061023b575f80fd5b5f91825260209091206004909102018054600182015460028301546003840180546001600160a01b0385169650600160a01b90940460ff1694929391929161028290610965565b80601f01602080910402602001604051908101604052809291908181526020018280546102ae90610965565b80156102f95780601f106102d0576101008083540402835291602001916102f9565b820191905f5260205f20905b8154815290600101906020018083116102dc57829003601f168201915b5050505050905085565b5f546001600160a01b0316331461032c5760405162461bcd60e51b81526004016101b29061091a565b8060028360ff16815481106103435761034361093d565b5f9182526020909120600390910201600201805460ff19169115159190911790555050565b60028181548110610377575f80fd5b905f5260205f2090600302015f91509050805f01805461039690610965565b80601f01602080910402602001604051908101604052809291908181526020018280546103c290610965565b801561040d5780601f106103e45761010080835404028352916020019161040d565b820191905f5260205f20905b8154815290600101906020018083116103f057829003601f168201915b50505050600183015460029093015491929160ff16905083565b5f546001600160a01b031633146104505760405162461bcd60e51b81526004016101b29061091a565b600280546040805160806020601f8801819004028201810190925260608101868152929392909182919088908890819085018382808284375f920182905250938552505050602080830187905260016040909301839052845492830185559381529290922081519192600302019081906104ca9082610af2565b50602082015160018201556040918201516002909101805460ff19169115159190911790555160ff8216907f517a8f8420567c4482b86333634d2ac19edc826a9155d1e962cd679d6bc74f8f9061052690879087908790610bad565b60405180910390a250505050565b60025460ff82161061057a5760405162461bcd60e51b815260206004820152600f60248201526e496e76616c6964207365727669636560881b60448201526064016101b2565b60028160ff16815481106105905761059061093d565b5f91825260209091206002600390920201015460ff166105e55760405162461bcd60e51b815260206004820152601060248201526f5365727669636520696e61637469766560801b60448201526064016101b2565b5f600380549050905060036040518060a00160405280336001600160a01b031681526020018460ff16815260200160028560ff16815481106106295761062961093d565b5f91825260208083206001600393840290910181015485524285830152604080518082018252600781526670656e64696e6760c81b81850152958101959095528654808201885596845292819020855160049097020180549186015160ff16600160a01b026001600160a81b03199092166001600160a01b03909716969096171785559183015190840155606082015160028401556080820151919291908201906106d49082610af2565b50506001805491505f6106e683610bd0565b909155505060405160ff83168152339082907f3e4c0f2a9bff996ba9c9e67c062e6de3aae15ec8e0353cb18e90d19916937b4b9060200160405180910390a35050565b5f5f83601f840112610739575f5ffd5b50813567ffffffffffffffff811115610750575f5ffd5b602083019150836020828501011115610767575f5ffd5b9250929050565b5f5f5f60408486031215610780575f5ffd5b83359250602084013567ffffffffffffffff81111561079d575f5ffd5b6107a986828701610729565b9497909650939450505050565b5f602082840312156107c6575f5ffd5b5035919050565b5f81518084528060208401602086015e5f602082860101526020601f19601f83011685010191505092915050565b60018060a01b038616815260ff8516602082015283604082015282606082015260a060808201525f61083060a08301846107cd565b979650505050505050565b803560ff8116811461084b575f5ffd5b919050565b5f5f60408385031215610861575f5ffd5b61086a8361083b565b91506020830135801515811461087e575f5ffd5b809150509250929050565b606081525f61089b60608301866107cd565b602083019490945250901515604090910152919050565b5f5f5f604084860312156108c4575f5ffd5b833567ffffffffffffffff8111156108da575f5ffd5b6108e686828701610729565b909790965060209590950135949350505050565b5f6020828403121561090a575f5ffd5b6109138261083b565b9392505050565b6020808252600990820152682737ba1037bbb732b960b91b604082015260600190565b634e487b7160e01b5f52603260045260245ffd5b634e487b7160e01b5f52604160045260245ffd5b600181811c9082168061097957607f821691505b60208210810361099757634e487b7160e01b5f52602260045260245ffd5b50919050565b601f8211156109ef57828211156109ef57805f5260205f20601f840160051c60208510156109c857505f5b90810190601f840160051c035f5b818110156109eb575f838201556001016109d6565b5050505b505050565b67ffffffffffffffff831115610a0c57610a0c610951565b610a2083610a1a8354610965565b8361099d565b5f601f841160018114610a51575f8515610a3a5750838201355b5f19600387901b1c1916600186901b178355610aa8565b5f83815260208120601f198716915b82811015610a805786850135825560209485019460019092019101610a60565b5086821015610a9c575f1960f88860031b161c19848701351681555b505060018560011b0183555b5050505050565b81835281816020850137505f828201602090810191909152601f909101601f19169091010190565b602081525f610aea602083018486610aaf565b949350505050565b815167ffffffffffffffff811115610b0c57610b0c610951565b610b2081610b1a8454610965565b8461099d565b6020601f821160018114610b52575f8315610b3b5750848201515b5f19600385901b1c1916600184901b178455610aa8565b5f84815260208120601f198516915b82811015610b815787850151825560209485019460019092019101610b61565b5084821015610b9e57868401515f19600387901b60f8161c191681555b50505050600190811b01905550565b604081525f610bc0604083018587610aaf565b9050826020830152949350505050565b5f60018201610bed57634e487b7160e01b5f52601160045260245ffd5b506001019056fea2646970667358221220eff931ea3a9a72bdcb8fbdb4ea1e21cf7bf6d5a10b750332978fc5607adab0fd64736f6c63430008230033405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace";
+// Real compiled bytecode — solc 0.8.35, optimizer 200 runs, evmVersion paris
+const CONTRACT_BYTECODE = "0x6080604052348015600f57600080fd5b5060405161105c38038061105c833981016040819052602c916045565b600080546001600160a01b03191633179055600355605d565b600060208284031215605657600080fd5b5051919050565b610ff08061006c6000396000f3fe6080604052600436106100dd5760003560e01c8063990de8ae1161007f578063aa55ecbc11610059578063aa55ecbc1461023d578063b151961114610252578063b9f8d3b414610265578063f3f437031461028557600080fd5b8063990de8ae146101e1578063a12247b0146101f7578063a5c68c591461020c57600080fd5b80633ccfd60b116100bb5780633ccfd60b146101655780635f81a57c1461017a5780638da5cb5b14610190578063933166e1146101b057600080fd5b806312697362146100e257806312e8e2c31461011f57806326232a2e14610141575b600080fd5b3480156100ee57600080fd5b506101026100fd366004610b12565b6102b2565b6040516001600160a01b0390911681526020015b60405180910390f35b34801561012b57600080fd5b5061013f61013a366004610b12565b6102dc565b005b34801561014d57600080fd5b5061015760035481565b604051908152602001610116565b34801561017157600080fd5b5061013f610368565b34801561018657600080fd5b5061015760025481565b34801561019c57600080fd5b50600054610102906001600160a01b031681565b3480156101bc57600080fd5b506101d06101cb366004610b47565b61042f565b604051610116959493929190610baf565b3480156101ed57600080fd5b5061015760015481565b34801561020357600080fd5b50600754610157565b34801561021857600080fd5b5061022c610227366004610b12565b610573565b604051610116959493929190610bf2565b34801561024957600080fd5b50600654610157565b61013f610260366004610c80565b61064c565b34801561027157600080fd5b5061013f610280366004610cd3565b61093d565b34801561029157600080fd5b506101576102a0366004610b47565b60056020526000908152604090205481565b600681815481106102c257600080fd5b6000918252602090912001546001600160a01b0316905081565b6000546001600160a01b031633146103275760405162461bcd60e51b81526020600482015260096024820152682737ba1037bbb732b960b91b60448201526064015b60405180910390fd5b6103e88111156103635760405162461bcd60e51b81526020600482015260076024820152664d61782031302560c81b604482015260640161031e565b600355565b33600090815260056020526040902054806103bb5760405162461bcd60e51b81526020600482015260136024820152724e6f7468696e6720746f20776974686472617760681b604482015260640161031e565b336000818152600560205260408082208290555183156108fc0291849190818181858888f193505050501580156103f6573d6000803e3d6000fd5b5060405181815233907f7084f5476618d8e60b11ef0d7d3f06914655adb8793e28ff7f018d4c76d505d59060200160405180910390a250565b60046020526000908152604090208054819061044a90610d44565b80601f016020809104026020016040519081016040528092919081815260200182805461047690610d44565b80156104c35780601f10610498576101008083540402835291602001916104c3565b820191906000526020600020905b8154815290600101906020018083116104a657829003601f168201915b5050505050908060010180546104d890610d44565b80601f016020809104026020016040519081016040528092919081815260200182805461050490610d44565b80156105515780601f1061052657610100808354040283529160200191610551565b820191906000526020600020905b81548152906001019060200180831161053457829003601f168201915b5050505060028301546003840154600490940154929360ff9091169290915085565b6007818154811061058357600080fd5b6000918252602090912060059091020180546001820154600283015460038401546004850180546001600160a01b0395861697509390941694919390926105c990610d44565b80601f01602080910402602001604051908101604052809291908181526020018280546105f590610d44565b80156106425780601f1061061757610100808354040283529160200191610642565b820191906000526020600020905b81548152906001019060200180831161062557829003601f168201915b5050505050905085565b6000341161068c5760405162461bcd60e51b815260206004820152600d60248201526c53656e6420736f6d652041524360981b604482015260640161031e565b6001600160a01b03831660009081526004602052604090206002015460ff166106eb5760405162461bcd60e51b815260206004820152601160248201527010dc99585d1bdc881b9bdd08199bdd5b99607a1b604482015260640161031e565b6000612710600354346106fe9190610d94565b6107089190610db1565b905060006107168234610dd3565b6001600160a01b038616600090815260046020526040812060030180549293509061074083610de6565b90915550506001600160a01b03851660009081526004602081905260408220018054839290610770908490610dff565b90915550506001600160a01b0385166000908152600560205260408120805483929061079d908490610dff565b9091555050600080546001600160a01b0316815260056020526040812080548492906107ca908490610dff565b9091555050600180549060006107df83610de6565b919050555034600260008282546107f69190610dff565b9250508190555060076040518060a00160405280336001600160a01b03168152602001876001600160a01b0316815260200134815260200142815260200186868080601f0160208091040260200160405190810160405280939291908181526020018383808284376000920182905250939094525050835460018082018655948252602091829020845160059092020180546001600160a01b03199081166001600160a01b0393841617825592850151958101805490931695909116949094179055506040810151600283015560608101516003830155608081015190919060048201906108e49082610e84565b505050846001600160a01b0316336001600160a01b03167f47699a4a144a6ecb85d9f1d3f809cbb382de4ad771c46d73422dd419cebec46534878760405161092e93929190610f70565b60405180910390a35050505050565b3360009081526004602052604090206002015460ff16156109955760405162461bcd60e51b8152602060048201526012602482015271105b1c9958591e481c9959da5cdd195c995960721b604482015260640161031e565b6040518060a0016040528085858080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250505090825250604080516020601f8601819004810282018101909252848152918101919085908590819084018382808284376000920182905250938552505060016020808501919091526040808501849052606090940183905233835260049052502081518190610a449082610e84565b5060208201516001820190610a599082610e84565b5060408281015160028301805460ff191691151591909117905560608301516003830155608090920151600490910155600680546001810182556000919091527ff652222313e28459528d920b65115c16c04f3efc82aaedc97be59f3f377c0d3f018054336001600160a01b0319909116811790915590517fc69c4b08ef3ac3499a548162bc0920f1f65d1559089f8c19d54ca0cb3b2651f690610b04908790879087908790610f93565b60405180910390a250505050565b600060208284031215610b2457600080fd5b5035919050565b80356001600160a01b0381168114610b4257600080fd5b919050565b600060208284031215610b5957600080fd5b610b6282610b2b565b9392505050565b6000815180845260005b81811015610b8f57602081850181015186830182015201610b73565b506000602082860101526020601f19601f83011685010191505092915050565b60a081526000610bc260a0830188610b69565b8281036020840152610bd48188610b69565b95151560408401525050606081019290925260809091015292915050565b6001600160a01b03868116825285166020820152604081018490526060810183905260a060808201819052600090610c2c90830184610b69565b979650505050505050565b60008083601f840112610c4957600080fd5b50813567ffffffffffffffff811115610c6157600080fd5b602083019150836020828501011115610c7957600080fd5b9250929050565b600080600060408486031215610c9557600080fd5b610c9e84610b2b565b9250602084013567ffffffffffffffff811115610cba57600080fd5b610cc686828701610c37565b9497909650939450505050565b60008060008060408587031215610ce957600080fd5b843567ffffffffffffffff811115610d0057600080fd5b610d0c87828801610c37565b909550935050602085013567ffffffffffffffff811115610d2c57600080fd5b610d3887828801610c37565b95989497509550505050565b600181811c90821680610d5857607f821691505b602082108103610d7857634e487b7160e01b600052602260045260246000fd5b50919050565b634e487b7160e01b600052601160045260246000fd5b8082028115828204841417610dab57610dab610d7e565b92915050565b600082610dce57634e487b7160e01b600052601260045260246000fd5b500490565b81810381811115610dab57610dab610d7e565b600060018201610df857610df8610d7e565b5060010190565b80820180821115610dab57610dab610d7e565b634e487b7160e01b600052604160045260246000fd5b601f821115610e7f5782821115610e7f57806000526020600020601f840160051c6020851015610e56575060005b90810190601f840160051c0360005b81811015610e7b57600083820155600101610e65565b5050505b505050565b815167ffffffffffffffff811115610e9e57610e9e610e12565b610eb281610eac8454610d44565b84610e28565b6020601f821160018114610ee65760008315610ece5750848201515b600019600385901b1c1916600184901b178455610f40565b600084815260208120601f198516915b82811015610f165787850151825560209485019460019092019101610ef6565b5084821015610f345786840151600019600387901b60f8161c191681555b505060018360011b0184555b5050505050565b81835281816020850137506000828201602090810191909152601f909101601f19169091010190565b838152604060208201526000610f8a604083018486610f47565b95945050505050565b604081526000610fa7604083018688610f47565b8281036020840152610c2c818587610f4756fea26469706673582212205895ff4577b5a9cd1275e2e18ae07e735fd316f415033373df26d651b6cc152364736f6c63430008230033";
+
+// Constructor argument: platformFee = 250 (2.5%)
+const CONSTRUCTOR_ARG = ethers.AbiCoder.defaultAbiCoder().encode(["uint256"], [250]);
 
 const CONTRACT_ABI = [
-  "constructor()",
+  "constructor(uint256 _platformFee)",
   "function owner() view returns (address)",
-  "function totalOrders() view returns (uint256)",
-  "function getServicesCount() view returns (uint256)",
-  "function getOrdersCount() view returns (uint256)",
-  "function services(uint256) view returns (string title, uint256 priceUSDC, bool active)",
-  "function orders(uint256) view returns (address client, uint8 serviceId, uint256 amount, uint256 timestamp, string status)",
-  "function addService(string title, uint256 priceUSDC) external",
-  "function toggleService(uint8 id, bool active) external",
-  "function placeOrder(uint8 serviceId) external",
-  "function updateOrderStatus(uint256 orderId, string status) external",
-  "event ServiceAdded(uint8 indexed id, string title, uint256 price)",
-  "event OrderPlaced(uint256 indexed orderId, address indexed client, uint8 serviceId)",
-  "event OrderUpdated(uint256 indexed orderId, string status)",
+  "function totalTips() view returns (uint256)",
+  "function totalVolume() view returns (uint256)",
+  "function platformFee() view returns (uint256)",
+  "function getCreatorsCount() view returns (uint256)",
+  "function getTipsCount() view returns (uint256)",
+  "function creators(address) view returns (string name, string category, bool active, uint256 tipsReceived, uint256 volumeReceived)",
+  "function pendingWithdrawals(address) view returns (uint256)",
+  "function registerCreator(string name, string category) external",
+  "function tip(address creator, string message) external payable",
+  "function withdraw() external",
+  "function setPlatformFee(uint256 _fee) external",
+  "event TipSent(address indexed sender, address indexed creator, uint256 amount, string message)",
+  "event CreatorRegistered(address indexed creator, string name, string category)",
+  "event Withdrawn(address indexed creator, uint256 amount)",
 ];
 
 export default function DeployPage() {
-  const [account, setAccount] = useState<string>("");
-  const [balance, setBalance] = useState<string>("");
-  const [status, setStatus] = useState<string>("");
-  const [contractAddress, setContractAddress] = useState<string>("");
+  const [account, setAccount] = useState("");
+  const [balance, setBalance] = useState("");
+  const [status, setStatus] = useState("");
+  const [contractAddress, setContractAddress] = useState("");
   const [deploying, setDeploying] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
+  const [verifyStatus, setVerifyStatus] = useState("");
 
   async function connectWallet() {
     try {
       setError("");
-      if (!window.ethereum) {
-        setError("No wallet detected. Install MetaMask or Rabby.");
-        return;
-      }
+      if (!window.ethereum) { setError("No wallet. Install MetaMask or Rabby."); return; }
       const provider = new ethers.BrowserProvider(window.ethereum);
       const accounts = await provider.send("eth_requestAccounts", []) as string[];
       setAccount(accounts[0]);
-
-      // Always add ARC network and switch to it
       await switchToArc();
-
-      // Fetch balance
       const bal = await provider.getBalance(accounts[0]);
       setBalance(parseFloat(ethers.formatEther(bal)).toFixed(4));
       setStatus("Wallet connected: " + accounts[0]);
-    } catch (e: unknown) {
-      const err = e as Error;
-      setError(err.message || "Connection failed");
-    }
+    } catch (e: unknown) { setError((e as Error).message); }
   }
 
   async function deployContract() {
     try {
-      setError("");
-      setDeploying(true);
-      setStatus("Preparing deployment...");
+      setError(""); setDeploying(true); setStatus("Switching to ARC Testnet...");
       if (!window.ethereum) throw new Error("No wallet");
-
-      // Ensure on ARC before deploying
       await switchToArc();
-
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      setStatus("Sending transaction...");
+      setStatus("Deploying PixelTip contract...");
       const factory = new ethers.ContractFactory(CONTRACT_ABI, CONTRACT_BYTECODE, signer);
-      const contract = await factory.deploy();
+      const contract = await factory.deploy(250); // 2.5% platform fee
       setStatus("Waiting for confirmation...");
       await contract.waitForDeployment();
       const addr = await contract.getAddress();
       setContractAddress(addr);
-      setStatus("Contract deployed successfully!");
-      // Refresh balance
+      setStatus("✓ Contract deployed! Verifying on ArcScan...");
       const bal = await provider.getBalance(account);
       setBalance(parseFloat(ethers.formatEther(bal)).toFixed(4));
+      // Auto-verify
+      await verifyOnArcScan(addr);
     } catch (e: unknown) {
-      const err = e as Error;
-      setError(err.message || "Deployment failed");
+      setError((e as Error).message || "Deploy failed");
       setStatus("");
-    } finally {
-      setDeploying(false);
+    } finally { setDeploying(false); }
+  }
+
+  async function verifyOnArcScan(addr: string) {
+    try {
+      setVerifyStatus("Submitting verification...");
+      const resp = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: addr }),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        setVerifyStatus("✓ Verification submitted! GUID: " + data.guid);
+      } else {
+        setVerifyStatus("Verification API: " + (data.error || "submitted, check ArcScan manually"));
+      }
+    } catch {
+      setVerifyStatus("Auto-verify failed. Verify manually at testnet.arcscan.app/verifyContract");
     }
   }
 
-  const panelStyle: React.CSSProperties = {
-    background: "var(--panel)",
-    border: "1px solid var(--border)",
-    padding: "24px",
-    marginBottom: "16px",
-  };
+  const p: React.CSSProperties = { background: "var(--panel)", border: "1px solid var(--border)", padding: "24px", marginBottom: "16px" };
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "'JetBrains Mono', monospace", padding: "40px 24px" }}>
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-
-        {/* Header */}
         <div style={{ borderBottom: "1px solid var(--accent)", paddingBottom: "16px", marginBottom: "32px" }}>
-          <div style={{ fontSize: "0.65rem", color: "var(--muted)", letterSpacing: "0.12em", marginBottom: "8px" }}>
-            PIXELTIP / ADMIN / CONTRACT_DEPLOY
-          </div>
-          <h1 style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)" }}>
-            PixelTipRegistry — ARC Testnet Deploy
-          </h1>
+          <div style={{ fontSize: "0.65rem", color: "var(--muted)", letterSpacing: "0.12em", marginBottom: "8px" }}>PIXELTIP / ADMIN / DEPLOY</div>
+          <h1 style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)" }}>PixelTip Contract — ARC Testnet</h1>
           <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: "4px" }}>
-            Chain ID: {ARC_CHAIN_ID} · Solidity 0.8.35 · Optimizer: 200 runs
+            Micro-tipping platform · Chain {ARC_CHAIN_ID} · solc 0.8.35 · Platform fee: 2.5%
           </div>
         </div>
 
-        {/* STEP 1 — Wallet */}
-        <div style={{ ...panelStyle, borderLeft: "3px solid var(--accent)" }}>
-          <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "16px" }}>
-            STEP 1 / CONNECT WALLET (auto-switches to ARC Testnet)
-          </div>
+        {/* Step 1 — Wallet */}
+        <div style={{ ...p, borderLeft: "3px solid var(--accent)" }}>
+          <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "16px" }}>STEP 1 / CONNECT WALLET (auto-switches to ARC)</div>
           {account ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--green)", fontWeight: 600 }}>
-                ✓ Connected: {account}
-              </div>
-              <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
-                Balance: <span style={{ color: "var(--text)", fontWeight: 600 }}>{balance} ARC</span>
-              </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--green)", fontWeight: 600 }}>✓ {account}</div>
+              <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>Balance: <span style={{ color: "var(--text)", fontWeight: 600 }}>{balance} ARC</span></div>
             </div>
           ) : (
             <button onClick={connectWallet} style={{ padding: "10px 24px", background: "var(--accent)", color: "var(--bg)", border: "none", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.12em", cursor: "pointer", fontFamily: "inherit" }}>
@@ -208,57 +206,44 @@ export default function DeployPage() {
           )}
         </div>
 
-        {/* STEP 2 — Source */}
-        <div style={panelStyle}>
-          <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "16px" }}>
-            STEP 2 / CONTRACT SOURCE (read-only — use for verification)
-          </div>
-          <textarea readOnly value={CONTRACT_SOURCE} style={{ width: "100%", height: "320px", background: "#080808", border: "1px solid var(--border)", color: "#a0d8af", fontSize: "0.68rem", fontFamily: "inherit", padding: "12px", resize: "vertical", outline: "none" }} />
+        {/* Step 2 — Source */}
+        <div style={p}>
+          <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "16px" }}>STEP 2 / CONTRACT SOURCE</div>
+          <textarea readOnly value={CONTRACT_SOURCE} style={{ width: "100%", height: "280px", background: "#080808", border: "1px solid var(--border)", color: "#a0d8af", fontSize: "0.65rem", fontFamily: "inherit", padding: "12px", resize: "vertical", outline: "none" }} />
         </div>
 
-        {/* STEP 3 — Deploy */}
-        <div style={{ ...panelStyle, borderLeft: contractAddress ? "3px solid var(--green)" : "3px solid var(--border)" }}>
-          <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "16px" }}>
-            STEP 3 / DEPLOY CONTRACT
-          </div>
-          <button
-            onClick={deployContract}
-            disabled={!account || deploying}
-            style={{ padding: "12px 32px", background: account && !deploying ? "var(--accent)" : "#333", color: account && !deploying ? "var(--bg)" : "var(--muted)", border: "none", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.12em", cursor: account && !deploying ? "pointer" : "not-allowed", fontFamily: "inherit" }}
-          >
+        {/* Step 3 — Deploy */}
+        <div style={{ ...p, borderLeft: contractAddress ? "3px solid var(--green)" : "3px solid var(--border)" }}>
+          <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "16px" }}>STEP 3 / DEPLOY + AUTO-VERIFY</div>
+          <button onClick={deployContract} disabled={!account || deploying}
+            style={{ padding: "12px 32px", background: account && !deploying ? "var(--accent)" : "#333", color: account && !deploying ? "var(--bg)" : "var(--muted)", border: "none", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.12em", cursor: account && !deploying ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
             {deploying ? "[ DEPLOYING... ]" : "[ DEPLOY CONTRACT ]"}
           </button>
 
-          {status && (
-            <div style={{ marginTop: "16px", padding: "10px 14px", background: "rgba(0,184,148,0.06)", border: "1px solid rgba(0,184,148,0.2)", fontSize: "0.72rem", color: "var(--green)" }}>
-              ► {status}
-            </div>
-          )}
-          {error && (
-            <div style={{ marginTop: "16px", padding: "10px 14px", background: "rgba(214,48,49,0.06)", border: "1px solid rgba(214,48,49,0.2)", fontSize: "0.72rem", color: "var(--red)" }}>
-              ✗ {error}
-            </div>
-          )}
+          {status && <div style={{ marginTop: "14px", padding: "10px", background: "rgba(0,184,148,0.06)", border: "1px solid rgba(0,184,148,0.2)", fontSize: "0.72rem", color: "var(--green)" }}>► {status}</div>}
+          {verifyStatus && <div style={{ marginTop: "8px", padding: "10px", background: "rgba(0,184,148,0.04)", border: "1px solid rgba(0,184,148,0.15)", fontSize: "0.7rem", color: "var(--accent)" }}>⬡ {verifyStatus}</div>}
+          {error && <div style={{ marginTop: "14px", padding: "10px", background: "rgba(214,48,49,0.06)", border: "1px solid rgba(214,48,49,0.2)", fontSize: "0.72rem", color: "var(--red)" }}>✗ {error}</div>}
+
           {contractAddress && (
             <div style={{ marginTop: "20px", padding: "16px", border: "1px solid var(--green)", background: "rgba(0,184,148,0.06)" }}>
-              <div style={{ fontSize: "0.62rem", color: "var(--muted)", letterSpacing: "0.1em", marginBottom: "8px" }}>CONTRACT DEPLOYED</div>
+              <div style={{ fontSize: "0.6rem", color: "var(--muted)", marginBottom: "6px" }}>CONTRACT ADDRESS</div>
               <div style={{ fontSize: "0.82rem", color: "var(--green)", fontWeight: 700, marginBottom: "12px", wordBreak: "break-all" }}>{contractAddress}</div>
               <a href={`${ARCSCAN}/address/${contractAddress}`} target="_blank" rel="noopener noreferrer"
-                style={{ display: "inline-block", padding: "8px 20px", border: "1px solid var(--green)", color: "var(--green)", textDecoration: "none", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em" }}>
+                style={{ display: "inline-block", padding: "8px 20px", border: "1px solid var(--green)", color: "var(--green)", textDecoration: "none", fontSize: "0.7rem", fontWeight: 600 }}>
                 [ VIEW ON ARCSCAN ↗ ]
               </a>
             </div>
           )}
         </div>
 
-        {/* Verification guide */}
-        <div style={{ ...panelStyle, fontSize: "0.68rem", color: "var(--muted)", lineHeight: 1.8 }}>
-          <div style={{ fontSize: "0.62rem", letterSpacing: "0.1em", marginBottom: "12px" }}>VERIFICATION GUIDE</div>
-          <div>1. Go to <a href={`${ARCSCAN}/verifyContract`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>testnet.arcscan.app/verifyContract</a></div>
-          <div>2. Paste contract address from above</div>
-          <div>3. Compiler: <strong style={{ color: "var(--text)" }}>v0.8.35+commit.d2d2e929</strong></div>
-          <div>4. License: MIT · Optimization: Yes, 200 runs</div>
-          <div>5. Paste source code from Step 2</div>
+        {/* Manual verify guide */}
+        <div style={{ ...p, fontSize: "0.68rem", color: "var(--muted)", lineHeight: 1.8 }}>
+          <div style={{ fontSize: "0.6rem", letterSpacing: "0.1em", marginBottom: "10px" }}>MANUAL VERIFICATION (if auto fails)</div>
+          <div>1. <a href={`${ARCSCAN}/verifyContract`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>testnet.arcscan.app/verifyContract</a></div>
+          <div>2. Compiler: <strong style={{ color: "var(--text)" }}>v0.8.35+commit.d2d2e929</strong></div>
+          <div>3. License: MIT · Optimization: Yes, 200 runs · EVM: paris</div>
+          <div>4. Paste source from Step 2</div>
+          <div style={{ marginTop: "8px", color: "var(--accent)", fontWeight: 600 }}>Constructor args (ABI-encoded): {CONSTRUCTOR_ARG}</div>
         </div>
       </div>
     </div>
