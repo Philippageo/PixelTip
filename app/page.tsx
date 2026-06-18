@@ -383,6 +383,74 @@ export default function Home() {
           </div>
         </section>
 
+        {/* AI Agent SOON */}
+        <section style={{ ...panel, marginBottom: "20px", borderLeft: "3px solid rgba(0,184,148,0.4)", position: "relative", overflow: "hidden" }}>
+          {/* Background grid effect */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundImage: "linear-gradient(rgba(0,184,148,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,184,148,0.03) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
+          <div style={{ position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+              <span style={label}>AI AGENT / COMING SOON</span>
+              <span style={{ background: "rgba(0,184,148,0.15)", color: "var(--accent)", fontSize: "0.55rem", padding: "2px 10px", letterSpacing: "0.15em", fontWeight: 700, border: "1px solid rgba(0,184,148,0.3)" }}>SOON</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", alignItems: "center" }}>
+              <div>
+                <h2 style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--text)", margin: "0 0 12px 0", lineHeight: 1.3 }}>
+                  Meet <span style={{ color: "var(--accent)" }}>PixelAgent</span> —<br />Your On-Chain AI Manager
+                </h2>
+                <p style={{ fontSize: "0.72rem", color: "var(--muted)", lineHeight: 1.8, margin: "0 0 16px 0" }}>
+                  An autonomous AI agent that runs on ARC Network. It monitors your creator profile, sends automated thank-you messages to tippers, routes payments, and optimizes your earnings — all on-chain, 24/7.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.68rem", color: "var(--muted)" }}>
+                  {[
+                    "Auto-reply to tips with personalized AI messages",
+                    "Smart routing — split tips between wallets on-chain",
+                    "Analytics dashboard — track earnings in real time",
+                    "ARC-native: agent holds funds in smart contract",
+                  ].map((f, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                      <span style={{ color: "var(--accent)", flexShrink: 0 }}>▸</span>
+                      <span>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Terminal mockup */}
+              <div style={{ background: "#050505", border: "1px solid var(--border)", padding: "16px", fontFamily: "inherit" }}>
+                <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
+                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ff5f57" }} />
+                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ffbd2e" }} />
+                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#28c840" }} />
+                  <span style={{ marginLeft: "8px", fontSize: "0.58rem", color: "var(--muted)", letterSpacing: "0.1em" }}>pixel-agent v0.1 — ARC TESTNET</span>
+                </div>
+                <div style={{ fontSize: "0.65rem", lineHeight: 2, color: "var(--muted)" }}>
+                  <div><span style={{ color: "var(--accent)" }}>$</span> agent.start()</div>
+                  <div style={{ color: "var(--green)" }}>✓ Monitoring contract 0x630A48...</div>
+                  <div><span style={{ color: "var(--accent)" }}>$</span> tip received: 1.0 ARC</div>
+                  <div style={{ color: "var(--green)" }}>✓ Auto-reply sent to 0xf81b...</div>
+                  <div><span style={{ color: "var(--accent)" }}>$</span> earnings: 12.5 ARC pending</div>
+                  <div><span style={{ color: "var(--accent)" }}>$</span> next action: withdraw at 20 ARC</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ color: "var(--accent)" }}>$</span>
+                    <span className="blink" style={{ display: "inline-block", width: "8px", height: "13px", background: "var(--accent)", verticalAlign: "middle" }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* CTA */}
+            <div style={{ marginTop: "20px", padding: "12px 16px", background: "rgba(0,184,148,0.05)", border: "1px solid rgba(0,184,148,0.15)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+              <div style={{ fontSize: "0.68rem", color: "var(--muted)" }}>
+                Powered by <span style={{ color: "var(--accent)", fontWeight: 700 }}>ARC Network</span> · Autonomous smart contract execution · Zero custody
+              </div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <span style={{ fontSize: "0.6rem", color: "var(--muted)", letterSpacing: "0.1em" }}>NOTIFY ME</span>
+                <div style={{ padding: "6px 16px", border: "1px solid var(--accent)", color: "var(--accent)", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", opacity: 0.6, cursor: "not-allowed" }}>
+                  [ JOIN WAITLIST ]
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Why ARC */}
         <section style={{ ...panel }}>
           <span style={label}>WHY ARC NETWORK</span>
