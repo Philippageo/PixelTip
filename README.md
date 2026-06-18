@@ -1,68 +1,70 @@
-# PixelTip — On-Chain Creator Tipping on ARC Testnet
+<div align="center">
 
-PixelTip is a decentralized tipping dApp built on **ARC Testnet**. Any creator can
-register an on-chain profile in one transaction, get a personal shareable page, and
-receive tips in native **ARC** tokens — instantly, transparently, and non-custodially.
+<img src="public/logo.svg" alt="PixelTip" width="104" height="104" />
 
-> Built as a focused demo to showcase both the ARC network (fast finality, low fees,
-> full transparency on ArcScan) and a real end-to-end web3 product.
+# PixelTip
 
-## What it does
+**On-chain creator tipping on ARC.**
+Spin up a profile, share your page, and get tipped in native **ARC** — instantly, transparently, no middleman.
 
-- **Register** — connect a wallet, pick a name + category, one tx writes your profile on-chain.
-- **Profile page** — every creator gets `/creator/<address>`: avatar, stats, a tip box, an
-  on-chain supporters feed, and a shareable link.
-- **Tip** — send ARC to any creator. 97.5% goes to them, 2.5% protocol fee. Settled on-chain.
-- **Withdraw** — tips accrue in the contract; creators withdraw anytime. No lock-up, no KYC.
-- **Live activity** — a global on-chain tip feed and a creator leaderboard, read straight
-  from the contract.
-- **Deploy console** — `/deploy` lets you redeploy + auto-verify the contract on ArcScan.
+[![Network](https://img.shields.io/badge/ARC-Testnet-00b894?style=flat-square)](https://testnet.arcscan.app)
+[![Chain](https://img.shields.io/badge/chain-5042002-00b894?style=flat-square)](https://testnet.arcscan.app)
+[![Built with Next.js](https://img.shields.io/badge/Next.js-16-111111?style=flat-square&logo=next.js)](https://nextjs.org)
+[![ethers](https://img.shields.io/badge/ethers-v6-111111?style=flat-square)](https://docs.ethers.org)
+[![License](https://img.shields.io/badge/license-MIT-00b894?style=flat-square)](#)
 
-## Smart contract
+### [→ Open the live app](https://pixeltip-brown.vercel.app)
 
-`PixelTip.sol` — Solidity `^0.8.20`, verified on ArcScan.
+</div>
 
-| Field | Value |
-| --- | --- |
-| Network | ARC Testnet |
-| Chain ID | `5042002` |
-| RPC | `https://rpc.testnet.arc.network` |
-| Explorer | `https://testnet.arcscan.app` |
-| Contract | `0x74d21b54c684f0b78E29D11e3A994C6605C1D545` |
-| Platform fee | 2.5% (250 bps) |
+---
 
-Core methods: `registerCreator(name, category)`, `tip(creator, message) payable`,
-`withdraw()`. State is fully readable: `creators`, `creatorList`, `tips`, `totalTips`,
-`totalVolume`, `getCreatorsCount`, `getTipsCount`.
+## ✨ The idea
 
-## Tech
+Tipping a creator usually means a platform sitting in the middle — taking a cut, holding your money,
+deciding the rules. PixelTip removes the middle.
 
-- **Next.js 16** (App Router, Turbopack) + **React 19**
-- **ethers v6** for wallet + contract interaction
-- Read-only data via the public ARC RPC (no wallet needed to browse)
-- Deterministic, dependency-free identicon avatars derived from the address
+Anyone can claim a profile on-chain, get a personal page like `pixeltip-brown.vercel.app/creator/0x…`,
+and start receiving tips in **ARC** the moment they share the link. Every tip is a real transaction:
+no custody, no sign-ups, no waiting for a payout. You can watch the money move on
+[ArcScan](https://testnet.arcscan.app) the second it lands.
 
-## Local development
+## 🎯 What you can do
 
-```bash
-npm install
-npm run dev      # http://localhost:3000
-npm run build    # production build
-```
+- **Claim a profile** — connect a wallet, pick a name and a craft. One transaction and you're live forever.
+- **Share one link** — every creator gets a clean public page with their stats, an identicon, and a tip box.
+- **Tip in ARC** — drop a creator some tokens with a message. 97.5% reaches them, 2.5% keeps the lights on.
+- **Cheer in public** — each page shows an on-chain wall of supporters and messages.
+- **Cash out anytime** — tips pile up in the contract; withdraw to your wallet whenever, no lock-up.
+- **Watch it live** — a global activity feed and leaderboard, read straight from the chain.
 
-You need an EVM wallet (MetaMask / Rabby) and some ARC testnet funds to register or tip.
-The app auto-adds and switches to ARC Testnet on connect.
-
-## Project structure
+## 🔁 How it works
 
 ```
-app/
-  page.tsx                  # directory: register / tip / withdraw / leaderboard / live feed
-  creator/[address]/page.tsx# public creator profile + tipping page
-  deploy/page.tsx           # deploy + verify console
-  api/verify/route.ts       # ArcScan source verification proxy
-components/                 # NavBar, Footer, Avatar
-lib/
-  arcNetwork.ts             # chain config + wallet switch helper
-  pixeltip.ts               # contract address, ABI, on-chain read helpers, formatters
+  ①  REGISTER            ②  SHARE                ③  EARN
+  connect · name ·       send your /creator      tips land on-chain ·
+  category · 1 tx        link anywhere           withdraw anytime
 ```
+
+## ⛓ On ARC
+
+Built natively on ARC Testnet, where tips settle in seconds and every action is public and verifiable.
+
+|              |                                                                                  |
+| ------------ | -------------------------------------------------------------------------------- |
+| Network      | ARC Testnet · chain `5042002`                                                    |
+| Contract     | [`0x74d21b54c684f0b78E29D11e3A994C6605C1D545`](https://testnet.arcscan.app/address/0x74d21b54c684f0b78E29D11e3A994C6605C1D545) |
+| Platform fee | 2.5%                                                                             |
+| Custody      | None — funds live in the smart contract, controlled by the creator              |
+
+The `PixelTip` contract is written in Solidity and verified on ArcScan, so anyone can read exactly
+what happens to a tip.
+
+## 🛠 Under the hood
+
+`Next.js 16` · `React 19` · `ethers v6` · native ARC RPC for read-only browsing · dependency-free
+identicons generated from each wallet address.
+
+<div align="center">
+<sub>Made with 🩵 for creators on ARC.</sub>
+</div>

@@ -95,7 +95,7 @@ export default function NavBar({ time, account, onConnect }: NavBarProps) {
             { label: "DIRECTORY", href: "/#leaderboard" },
             { label: "REGISTER", href: "/#register" },
             { label: "ACTIVITY", href: "/#activity" },
-            { label: "DEPLOY", href: "/deploy" },
+            { label: "HOW IT WORKS", href: "/#how" },
           ].map((item) => (
             <a key={item.href} href={item.href}
               style={{ color: "var(--muted)", textDecoration: "none", fontSize: "0.7rem", letterSpacing: "0.1em", textTransform: "uppercase", transition: "color 0.2s" }}
