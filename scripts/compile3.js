@@ -1,6 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+/**
+ * Compile PixelTip contract with exact solc version that ArcScan supports.
+ * We install solc@0.8.20 specifically to match the verifier.
+ */
+const solc = require("solc");
+const fs = require("fs");
+const path = require("path");
 
-const CONTRACT_SOURCE = `// SPDX-License-Identifier: MIT
+const source = `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 contract PixelTip {
@@ -82,46 +88,34 @@ contract PixelTip {
     }
 }`;
 
-export async function POST(req: NextRequest) {
-  try {
-    const { address } = await req.json();
-    if (!address) return NextResponse.json({ ok: false, error: "No address" }, { status: 400 });
+const input = {
+  language: "Solidity",
+  sources: { "PixelTip.sol": { content: source } },
+  settings: {
+    optimizer: { enabled: true, runs: 200 },
+    evmVersion: "paris",
+    outputSelection: { "*": { "*": ["abi", "evm.bytecode.object", "metadata"] } },
+  },
+};
 
-    const params = new URLSearchParams({
-      apikey: "YourApiKeyToken",
-      module: "contract",
-      action: "verifysourcecode",
-      contractaddress: address,
-      sourceCode: CONTRACT_SOURCE,
-      codeformat: "solidity-single-file",
-      contractname: "PixelTip",
-      compilerversion: "v0.8.20+commit.a1b79de6",
-      optimizationUsed: "1",
-      runs: "200",
-      evmversion: "paris",
-      licenseType: "3",
-      constructorArguements: "00000000000000000000000000000000000000000000000000000000000000fa",
-    });
+const output = JSON.parse(solc.compile(JSON.stringify(input)));
 
-    const resp = await fetch("https://testnet.arcscan.app/api", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mozilla/5.0",
-        "Origin": "https://testnet.arcscan.app",
-        "Referer": "https://testnet.arcscan.app/verifyContract",
-      },
-      body: params.toString(),
-    });
-
-    const data = await resp.json();
-
-    if (data.status === "1") {
-      return NextResponse.json({ ok: true, guid: data.result });
-    } else {
-      return NextResponse.json({ ok: false, error: data.result || data.message });
-    }
-  } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as Error).message });
-  }
+if (output.errors) {
+  const errors = output.errors.filter(e => e.severity === "error");
+  if (errors.length) { console.error(JSON.stringify(errors, null, 2)); process.exit(1); }
+  output.errors.forEach(e => console.log(e.severity + ":", e.formattedMessage));
 }
+
+const contract = output.contracts["PixelTip.sol"]["PixelTip"];
+const bytecode = "0x" + contract.evm.bytecode.object;
+const abi = contract.abi;
+const solcVersion = solc.version();
+
+// Extract exact version string for ArcScan
+console.log("solc version:", solcVersion);
+console.log("Bytecode length:", bytecode.length);
+
+const result = { bytecode, abi, source, solcVersion };
+fs.mkdirSync(path.join(__dirname, "../lib"), { recursive: true });
+fs.writeFileSync(path.join(__dirname, "../lib/pixeltip_v2.json"), JSON.stringify(result, null, 2));
+console.log("✓ Written to lib/pixeltip_v2.json");
