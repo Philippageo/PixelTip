@@ -6,7 +6,7 @@ import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import { ARC_RPC, ARCSCAN, switchToArc } from "@/lib/arcNetwork";
 
-const CONTRACT_ADDRESS = "0x630A48CD29223ffe02F53bbf751fCAc2dda12b5F";
+const CONTRACT_ADDRESS = "0x74d21b54c684f0b78E29D11e3A994C6605C1D545";
 const CONTRACT_ABI = [
   "function owner() view returns (address)",
   "function totalTips() view returns (uint256)",

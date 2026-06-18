@@ -1,6 +1,6 @@
 "use client";
 
-const CONTRACT_ADDRESS = "0x630A48CD29223ffe02F53bbf751fCAc2dda12b5F";
+const CONTRACT_ADDRESS = "0x74d21b54c684f0b78E29D11e3A994C6605C1D545";
 const ARCSCAN = "https://testnet.arcscan.app";
 
 export default function Footer() {
