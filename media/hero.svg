@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 220" width="760" height="220" role="img" aria-label="PixelTip — a CRT terminal tip jar on Arc">
+  <defs>
+    <linearGradient id="crtVign" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#101010"/>
+      <stop offset="0.5" stop-color="#0c0c0c"/>
+      <stop offset="1" stop-color="#070707"/>
+    </linearGradient>
+    <radialGradient id="crtGlow" cx="50%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#00b894" stop-opacity="0.16"/>
+      <stop offset="0.55" stop-color="#00b894" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#00b894" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="4" fill="none"/>
+      <rect width="4" height="2" y="2" fill="#000000" fill-opacity="0.28"/>
+    </pattern>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- bezel -->
+  <rect x="0" y="0" width="760" height="220" rx="16" fill="#1a1a1a"/>
+  <rect x="8" y="8" width="744" height="204" rx="11" fill="url(#crtVign)"/>
+  <rect x="8" y="8" width="744" height="204" rx="11" fill="url(#crtGlow)"/>
+
+  <!-- top status bar -->
+  <g font-family="'Courier New',monospace" fill="#636e72" font-size="11" letter-spacing="1.5">
+    <circle cx="30" cy="32" r="4" fill="#d63031"/>
+    <circle cx="44" cy="32" r="4" fill="#fdcb2e" fill-opacity="0.55"/>
+    <circle cx="58" cy="32" r="4" fill="#00b894"/>
+    <text x="80" y="36">pixeltip@arc:~$ tipjar --live</text>
+    <text x="600" y="36" fill="#00b894">CHAIN 5042002</text>
+  </g>
+  <line x1="20" y1="48" x2="740" y2="48" stroke="#1e1e1e" stroke-width="1"/>
+
+  <!-- pixel coin (left) -->
+  <g transform="translate(56,86)" shape-rendering="crispEdges">
+    <rect x="12" y="0"  width="36" height="6" fill="#00b894"/>
+    <rect x="6"  y="6"  width="48" height="6" fill="#00b894"/>
+    <rect x="0"  y="12" width="60" height="36" fill="#00b894"/>
+    <rect x="6"  y="48" width="48" height="6" fill="#00b894"/>
+    <rect x="12" y="54" width="36" height="6" fill="#00b894"/>
+    <!-- inner shade -->
+    <rect x="12" y="12" width="36" height="30" fill="#0c0c0c" fill-opacity="0.0"/>
+    <rect x="8"  y="14" width="6" height="32" fill="#0a8f73"/>
+    <rect x="46" y="14" width="6" height="32" fill="#063f33"/>
+    <!-- ¢ glyph -->
+    <rect x="26" y="14" width="6" height="6" fill="#0c0c0c"/>
+    <rect x="20" y="20" width="6" height="20" fill="#0c0c0c"/>
+    <rect x="26" y="20" width="14" height="6" fill="#0c0c0c"/>
+    <rect x="26" y="34" width="14" height="6" fill="#0c0c0c"/>
+    <rect x="26" y="40" width="6" height="6" fill="#0c0c0c"/>
+  </g>
+
+  <!-- wordmark -->
+  <g font-family="'Courier New',monospace" filter="url(#soft)">
+    <text x="150" y="118" font-size="58" font-weight="700" fill="#dfe6e9" letter-spacing="2">Pixel<tspan fill="#00b894">Tip</tspan></text>
+    <rect x="556" y="92" width="14" height="34" fill="#00b894">
+      <animate attributeName="opacity" values="1;1;0;0" dur="1s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+  <text x="152" y="150" font-family="'Courier New',monospace" font-size="15" fill="#636e72" letter-spacing="3">&gt; ON-CHAIN TIP JAR FOR CREATORS</text>
+
+  <!-- pixel heart (right) -->
+  <g transform="translate(648,150)" shape-rendering="crispEdges">
+    <rect x="6"  y="0"  width="12" height="6" fill="#d63031"/>
+    <rect x="30" y="0"  width="12" height="6" fill="#d63031"/>
+    <rect x="0"  y="6"  width="48" height="12" fill="#d63031"/>
+    <rect x="6"  y="18" width="36" height="6"  fill="#d63031"/>
+    <rect x="12" y="24" width="24" height="6"  fill="#d63031"/>
+    <rect x="18" y="30" width="12" height="6"  fill="#d63031"/>
+    <rect x="6"  y="6"  width="8"  height="6"  fill="#ff6b6b"/>
+    <animateTransform attributeName="transform" type="translate" additive="sum" values="0 0;0 -3;0 0" dur="1.6s" repeatCount="indefinite"/>
+  </g>
+
+  <!-- bottom ticker line -->
+  <line x1="20" y1="180" x2="740" y2="180" stroke="#1e1e1e" stroke-width="1"/>
+  <text x="30" y="200" font-family="'Courier New',monospace" font-size="11" fill="#3a4a45" letter-spacing="2">tip() · withdraw() · 2.5% fee · no signup · the chain is the database</text>
+
+  <!-- scanline + curvature overlay -->
+  <rect x="8" y="8" width="744" height="204" rx="11" fill="url(#scan)"/>
+  <rect x="8" y="8" width="744" height="204" rx="11" fill="none" stroke="#000000" stroke-opacity="0.5" stroke-width="2"/>
+  <rect x="9" y="9" width="742" height="202" rx="10" fill="none" stroke="#00b894" stroke-opacity="0.10" stroke-width="1"/>
+</svg>

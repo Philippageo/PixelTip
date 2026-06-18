@@ -1,5 +1,7 @@
 # PixelTip — questions people actually ask me
 
+<img src="media/hero.svg" width="100%" alt="PixelTip — an on-chain CRT tip jar for creators on Arc">
+
 PixelTip is a tip jar for creators that lives entirely on the Arc testnet: you claim a profile, you get a link, people send you money on it, and you pull that money out whenever you feel like it. No account on my server, no dashboard I control, no payout schedule.
 
 I kept getting the same handful of questions when I showed this to other designers, so I just wrote the answers down. Here they are, in roughly the order people ask them.
