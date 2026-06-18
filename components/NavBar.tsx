@@ -6,10 +6,13 @@ import { ARC_RPC, ARCSCAN, ARC_CHAIN_HEX, switchToArc } from "@/lib/arcNetwork";
 
 interface NavBarProps {
   time: string;
+  /** Shared wallet account — owned by the page so the nav and page never disagree. */
+  account: string;
+  /** Connect handler owned by the page (does requestAccounts + switchToArc + load). */
+  onConnect: () => void | Promise<void>;
 }
 
-export default function NavBar({ time }: NavBarProps) {
-  const [account, setAccount] = useState<string>("");
+export default function NavBar({ time, account, onConnect }: NavBarProps) {
   const [balance, setBalance] = useState<string>("");
   const [chainOk, setChainOk] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -34,20 +37,10 @@ export default function NavBar({ time }: NavBarProps) {
     }
   }
 
-  async function connectWallet() {
-    if (!window.ethereum) return;
+  async function handleConnect() {
     setConnecting(true);
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await provider.send("eth_requestAccounts", []) as string[];
-      const addr = accounts[0];
-      setAccount(addr);
-
-      // Always switch to ARC — add network first, then switch
-      await switchToArc();
-      setChainOk(true);
-
-      await fetchBalance(addr);
+      await onConnect();
     } catch (e) {
       console.error("Wallet connect error:", e);
     } finally {
@@ -67,49 +60,18 @@ export default function NavBar({ time }: NavBarProps) {
     };
   }, []);
 
-  // Watch account changes
+  // Sync balance + chain badge whenever the shared account changes; refresh every 30s.
   useEffect(() => {
-    if (!window.ethereum?.on) return;
-    const handler = (accounts: unknown) => {
-      const list = accounts as string[];
-      if (list.length > 0) {
-        setAccount(list[0]);
-        fetchBalance(list[0]);
-      } else {
-        setAccount("");
-        setBalance("");
-        setChainOk(false);
-      }
-    };
-    window.ethereum.on("accountsChanged", handler);
-    return () => {
-      window.ethereum?.removeListener?.("accountsChanged", handler);
-    };
-  }, []);
-
-  // Auto-refresh balance every 30s
-  useEffect(() => {
-    if (!account) return;
+    if (!account) {
+      setBalance("");
+      setChainOk(false);
+      return;
+    }
+    fetchBalance(account);
+    checkChain();
     const interval = setInterval(() => fetchBalance(account), 30000);
     return () => clearInterval(interval);
   }, [account]);
-
-  // On mount: check if already connected
-  useEffect(() => {
-    async function init() {
-      if (!window.ethereum) return;
-      try {
-        const accounts = await window.ethereum.request({ method: "eth_accounts" }) as string[];
-        if (accounts.length > 0) {
-          setAccount(accounts[0]);
-          await checkChain();
-          await fetchBalance(accounts[0]);
-        }
-      } catch { /* ignore */ }
-    }
-    init();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function shortAddr(addr: string) {
     return addr.slice(0, 6) + "..." + addr.slice(-4);
@@ -120,22 +82,27 @@ export default function NavBar({ time }: NavBarProps) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 24px", maxWidth: "1600px", margin: "0 auto", gap: "16px" }}>
 
         {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
+        <a href="/" style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0, textDecoration: "none" }}>
           <span style={{ color: "var(--accent)", fontSize: "1.2rem", fontWeight: 700, letterSpacing: "0.15em" }} className="glow">
             PIXEL<span style={{ color: "var(--text)" }}>TIP</span>
           </span>
           <span style={{ background: "var(--accent)", color: "var(--bg)", fontSize: "0.6rem", padding: "1px 6px", fontWeight: 700, letterSpacing: "0.1em" }}>LIVE</span>
-        </div>
+        </a>
 
         {/* Nav */}
         <nav style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-          {["#services", "#portfolio", "#tutor", "#contact"].map((href) => (
-            <a key={href} href={href}
+          {[
+            { label: "DIRECTORY", href: "/#leaderboard" },
+            { label: "REGISTER", href: "/#register" },
+            { label: "ACTIVITY", href: "/#activity" },
+            { label: "DEPLOY", href: "/deploy" },
+          ].map((item) => (
+            <a key={item.href} href={item.href}
               style={{ color: "var(--muted)", textDecoration: "none", fontSize: "0.7rem", letterSpacing: "0.1em", textTransform: "uppercase", transition: "color 0.2s" }}
               onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--accent)")}
               onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--muted)")}
             >
-              {href.replace("#", "")}
+              {item.label}
             </a>
           ))}
         </nav>
@@ -186,7 +153,7 @@ export default function NavBar({ time }: NavBarProps) {
             </div>
           ) : (
             <button
-              onClick={connectWallet}
+              onClick={handleConnect}
               disabled={connecting}
               style={{
                 padding: "5px 14px",
