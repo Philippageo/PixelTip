@@ -1,3 +1,8 @@
+// -----------------------------------------------------------------------------
+// ARC Testnet — connection constants + the add/switch helper used by the nav.
+// Values here are fixed by the network; only the wrapping changes between builds.
+// -----------------------------------------------------------------------------
+
 declare global {
   interface Window {
     ethereum?: {
@@ -8,12 +13,17 @@ declare global {
   }
 }
 
-// ARC Testnet network config
+// Numeric chain id, then its 0x form. toHex keeps the two in lock-step.
+const toHex = (n: number) => "0x" + n.toString(16);
+
 export const ARC_CHAIN_ID = 5042002;
-export const ARC_CHAIN_HEX = "0x" + ARC_CHAIN_ID.toString(16);
+export const ARC_CHAIN_HEX = toHex(ARC_CHAIN_ID);
+
+// Public endpoints.
 export const ARC_RPC = "https://rpc.testnet.arc.network";
 export const ARCSCAN = "https://testnet.arcscan.app";
 
+// EIP-3085 payload handed to wallet_addEthereumChain.
 export const ARC_NETWORK_PARAMS = {
   chainId: ARC_CHAIN_HEX,
   chainName: "ARC Testnet",
@@ -23,24 +33,25 @@ export const ARC_NETWORK_PARAMS = {
 };
 
 /**
- * Adds ARC Testnet to wallet (if not present) and switches to it.
- * Always attempts to switch regardless of current chain.
+ * Ensures the wallet knows about ARC Testnet and then makes it the active chain.
+ * The switch is always issued, no matter what chain is currently selected.
  */
 export async function switchToArc(): Promise<void> {
-  if (!window.ethereum) throw new Error("No wallet detected");
+  const provider = window.ethereum;
+  if (!provider) throw new Error("No wallet detected");
 
-  // First try to add the network (safe to call even if already added)
+  // Adding is idempotent — wallets that already have ARC may reject, which is fine.
   try {
-    await window.ethereum.request({
+    await provider.request({
       method: "wallet_addEthereumChain",
       params: [ARC_NETWORK_PARAMS],
     });
   } catch {
-    // Some wallets throw if chain already exists — ignore
+    /* chain already registered — nothing to do */
   }
 
-  // Then force switch
-  await window.ethereum.request({
+  // Now flip to ARC.
+  await provider.request({
     method: "wallet_switchEthereumChain",
     params: [{ chainId: ARC_CHAIN_HEX }],
   });
